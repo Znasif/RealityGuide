@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 client = genai.Client()
 OBJECT_CROP_DIR = Path("data/object_crops")
 FIRST_STEP_HIGHLIGHT_PATH = Path("data/first_step_highlight.png")
+BANANA_OUTPUT_PATH = Path("data/first_step_banana.png")
 
 
 class ObjectItem(BaseModel):
@@ -57,7 +58,6 @@ class OutputSchema(BaseModel):
 def main():
     json = plan()
     print(json.model_dump_json(indent=2))
-    # banana()
 
 
 def plan():
@@ -134,8 +134,6 @@ Produce an ordered list of detailed, clear, imperative manipulation steps that r
 For each step set "object_label" to the single most relevant label taken verbatim from the list above.
 Return JSON structured exactly as {{"goal": <final_goal>, "steps": [{{"text": <step_text>, "object_label": <object_label>}}, ...]}} with the goal field appearing before steps."""
 
-    print(steps_prompt)
-
     step_contents = [analysis_image, *resized_crop_images, steps_prompt]
 
     steps_text = client.models.generate_content(
@@ -161,6 +159,25 @@ Return JSON structured exactly as {{"goal": <final_goal>, "steps": [{{"text": <s
     else:
         print(
             "Skipped first-step bounding box visualization because no matching object was found for the first step."
+        )
+
+    banana_path: Optional[Path] = None
+    first_step = steps.steps[0] if steps.steps else None
+    if highlight_path and first_step:
+        banana_path = banana(
+            step_text=first_step.text,
+            annotated_image_path=highlight_path,
+            output_path=BANANA_OUTPUT_PATH,
+        )
+        if banana_path:
+            print(f"Generated banana image for the first step at {banana_path}")
+        else:
+            print("Banana image generation failed.")
+    elif first_step is None:
+        print("Banana image generation skipped because no steps were returned.")
+    else:
+        print(
+            "Banana image generation skipped because the first-step bounding box image was unavailable."
         )
 
     return OutputSchema(goal=steps.goal, objects=analysis.objects, steps=steps.steps)
@@ -203,13 +220,14 @@ def slugify_label(label: str) -> str:
     return slug or "object"
 
 
-def banana():
-    prompt = """\
-Using the provided image, apply the following action to the scene: "Move the regular glasses next to the sunglasses."
+def banana(
+    step_text: str, annotated_image_path: Path, output_path: Path
+) -> Optional[Path]:
+    prompt = f"""\
+Using the provided image, apply the following: {step_text}."""
 
-Modify only what is necessary to perform this action. Keep all other elements of the image exactly the same."""
-
-    image = get_image_resized("data/1.png")
+    with Image.open(annotated_image_path) as annotated_image:
+        image = resize_image(annotated_image)
 
     response = client.models.generate_content(
         model="gemini-2.5-flash-image",
@@ -217,18 +235,20 @@ Modify only what is necessary to perform this action. Keep all other elements of
         config=types.GenerateContentConfig(response_modalities=["Image"]),
     )
 
-    assert response.parts is not None
+    if response.parts is None:
+        return None
 
     for part in response.parts:
-        if part.inline_data is not None:
-            image = part.as_image()
-            assert image is not None
-            image.save("data/generated.png")
+        if part.inline_data is None:
+            continue
+        generated = part.as_image()
+        if generated is None:
+            continue
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        generated.save(str(output_path))
+        return output_path
 
-
-def get_image_resized(img_path: str):
-    image = Image.open(img_path)
-    return resize_image(image)
+    return None
 
 
 def resize_image(image: Image.Image, target_width: int = 1000) -> Image.Image:
