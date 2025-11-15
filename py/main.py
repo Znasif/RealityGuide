@@ -1,9 +1,11 @@
+import argparse
+import re
+from pathlib import Path
+from typing import List, Optional, Tuple
+
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
-from pathlib import Path
-from typing import List, Optional, Tuple
-import re
 from PIL import Image, ImageDraw
 
 
@@ -56,12 +58,20 @@ class OutputSchema(BaseModel):
 
 
 def main():
-    json = plan()
+    parser = argparse.ArgumentParser(
+        description="Generate a manipulation plan and auxiliary images from a scene."
+    )
+    parser.add_argument(
+        "image_path", type=Path, help="Path to the source scene image to analyze."
+    )
+    args = parser.parse_args()
+
+    json = plan(args.image_path)
     print(json.model_dump_json(indent=2))
 
 
-def plan():
-    image_path = "data/2.jpg"
+def plan(image_path: Path) -> OutputSchema:
+    image_path = Path(image_path)
     original_image = Image.open(image_path)
     analysis_image = resize_image(original_image)
 
