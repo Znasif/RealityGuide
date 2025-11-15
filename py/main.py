@@ -2,13 +2,14 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import re
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 client = genai.Client()
 OBJECT_CROP_DIR = Path("data/object_crops")
+FIRST_STEP_HIGHLIGHT_PATH = Path("data/first_step_highlight.png")
 
 
 class ObjectItem(BaseModel):
@@ -25,11 +26,20 @@ class AnalysisSchema(BaseModel):
     objects: List[ObjectItem] = Field(description="List of detected objects.")
 
 
+class StepItem(BaseModel):
+    text: str = Field(description="Detailed manipulation instruction.")
+    object_label: str = Field(
+        description="Label of the primary object mentioned in this step."
+    )
+
+
 class StepsSchema(BaseModel):
     goal: str = Field(
         description="Refined goal after reviewing the scene and cropped objects."
     )
-    steps: List[str] = Field(description="List of manipulation steps.")
+    steps: List[StepItem] = Field(
+        description="List of manipulation steps paired with object references."
+    )
 
 
 class OutputSchema(BaseModel):
@@ -39,7 +49,9 @@ class OutputSchema(BaseModel):
     objects: List[ObjectItem] = Field(
         description="List of detected objects with bounding boxes."
     )
-    steps: List[str] = Field(description="List of steps.")
+    steps: List[StepItem] = Field(
+        description="List of steps paired with object references."
+    )
 
 
 def main():
@@ -119,7 +131,8 @@ Objects:
 
 If the initial goal already fits, repeat it verbatim. Otherwise, refine it to something more appropriate now that you have detailed context.
 Produce an ordered list of detailed, clear, imperative manipulation steps that reference the object labels directly.
-Return JSON structured exactly as {{"goal": <final_goal>, "steps": [<step>, ...]}} with the goal field appearing before steps."""
+For each step set "object_label" to the single most relevant label taken verbatim from the list above.
+Return JSON structured exactly as {{"goal": <final_goal>, "steps": [{{"text": <step_text>, "object_label": <object_label>}}, ...]}} with the goal field appearing before steps."""
 
     print(steps_prompt)
 
@@ -140,6 +153,16 @@ Return JSON structured exactly as {{"goal": <final_goal>, "steps": [<step>, ...]
 
     steps = StepsSchema.model_validate_json(steps_text)
 
+    highlight_path = highlight_first_step(
+        original_image, analysis.objects, steps.steps, FIRST_STEP_HIGHLIGHT_PATH
+    )
+    if highlight_path:
+        print(f"Saved first-step bounding box visualization to {highlight_path}")
+    else:
+        print(
+            "Skipped first-step bounding box visualization because no matching object was found for the first step."
+        )
+
     return OutputSchema(goal=steps.goal, objects=analysis.objects, steps=steps.steps)
 
 
@@ -151,17 +174,9 @@ def crop_and_save_objects(
     assets: List[Tuple[ObjectItem, Image.Image, Path]] = []
 
     for idx, obj in enumerate(objects, start=1):
-        ymin, xmin, ymax, xmax = obj.box_2d
-
-        y_min_px = clamp(normalized_to_pixels(ymin, height), 0, max(height - 1, 0))
-        y_max_px = clamp(normalized_to_pixels(ymax, height), 0, height)
-        x_min_px = clamp(normalized_to_pixels(xmin, width), 0, max(width - 1, 0))
-        x_max_px = clamp(normalized_to_pixels(xmax, width), 0, width)
-
-        if y_max_px <= y_min_px:
-            y_max_px = clamp(y_min_px + 1, 0, height)
-        if x_max_px <= x_min_px:
-            x_max_px = clamp(x_min_px + 1, 0, width)
+        x_min_px, y_min_px, x_max_px, y_max_px = normalized_box_to_pixels(
+            obj.box_2d, width, height
+        )
 
         crop = image.crop((x_min_px, y_min_px, x_max_px, y_max_px))
         crop_path = dest_dir / f"object_{idx}_{slugify_label(obj.label)}.png"
@@ -225,6 +240,67 @@ def resize_images(
     images: List[Image.Image], target_width: int = 1000
 ) -> List[Image.Image]:
     return [resize_image(image, target_width) for image in images]
+
+
+def normalized_box_to_pixels(
+    box_2d: Tuple[int, int, int, int], width: int, height: int
+) -> Tuple[int, int, int, int]:
+    ymin, xmin, ymax, xmax = box_2d
+
+    y_min_px = clamp(normalized_to_pixels(ymin, height), 0, max(height - 1, 0))
+    y_max_px = clamp(normalized_to_pixels(ymax, height), 0, height)
+    x_min_px = clamp(normalized_to_pixels(xmin, width), 0, max(width - 1, 0))
+    x_max_px = clamp(normalized_to_pixels(xmax, width), 0, width)
+
+    if y_max_px <= y_min_px:
+        y_max_px = clamp(y_min_px + 1, 0, height)
+    if x_max_px <= x_min_px:
+        x_max_px = clamp(x_min_px + 1, 0, width)
+
+    return x_min_px, y_min_px, x_max_px, y_max_px
+
+
+def find_object_by_label(label: str, objects: List[ObjectItem]) -> Optional[ObjectItem]:
+    normalized_target = label.strip().lower()
+    if not normalized_target:
+        return None
+
+    for obj in objects:
+        if obj.label.strip().lower() == normalized_target:
+            return obj
+
+    return None
+
+
+def highlight_first_step(
+    image: Image.Image,
+    objects: List[ObjectItem],
+    steps: List[StepItem],
+    output_path: Path,
+) -> Optional[Path]:
+    if not steps:
+        return None
+
+    first_step = steps[0]
+    target_object = find_object_by_label(first_step.object_label, objects)
+    if target_object is None:
+        return None
+
+    annotated = image.copy()
+    width, height = annotated.size
+    x_min_px, y_min_px, x_max_px, y_max_px = normalized_box_to_pixels(
+        target_object.box_2d, width, height
+    )
+
+    draw = ImageDraw.Draw(annotated)
+    stroke_width = max(2, int(min(width, height) * 0.005))
+    draw.rectangle(
+        (x_min_px, y_min_px, x_max_px, y_max_px), outline="red", width=stroke_width
+    )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    annotated.save(output_path)
+    return output_path
 
 
 if __name__ == "__main__":
