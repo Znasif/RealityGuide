@@ -1,47 +1,77 @@
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+from pathlib import Path
 from typing import List, Tuple
-import textwrap
+import re
 from PIL import Image
 
 
 client = genai.Client()
+OBJECT_CROP_DIR = Path("data/object_crops")
+
+
+class ObjectItem(BaseModel):
+    label: str = Field(description="A unique identifying label.")
+    box_2d: Tuple[int, int, int, int] = Field(
+        description="Normalized [ymin, xmin, ymax, xmax] bounding box coordinates in the 0–1000 range."
+    )
+
+
+class AnalysisSchema(BaseModel):
+    goal: str = Field(
+        description="High-level natural language goal inferred from the image."
+    )
+    objects: List[ObjectItem] = Field(description="List of detected objects.")
+
+
+class StepsSchema(BaseModel):
+    goal: str = Field(
+        description="Refined goal after reviewing the scene and cropped objects."
+    )
+    steps: List[str] = Field(description="List of manipulation steps.")
+
+
+class OutputSchema(BaseModel):
+    goal: str = Field(
+        description="High-level natural language goal inferred from the image."
+    )
+    objects: List[ObjectItem] = Field(
+        description="List of detected objects with bounding boxes."
+    )
+    steps: List[str] = Field(description="List of steps.")
 
 
 def main():
-    # json = plan()
-    # print(json.model_dump_json(indent=2))
-    banana()
+    json = plan()
+    print(json.model_dump_json(indent=2))
+    # banana()
 
 
 def plan():
-    class PointItem(BaseModel):
-        point: Tuple[int, int] = Field(
-            description="The normalized [y, x] coordinates, integers in the range 0–1000."
-        )
-        label: str = Field(description="A unique identifying label.")
+    image_path = "data/2.jpg"
+    original_image = Image.open(image_path)
+    analysis_image = resize_image(original_image)
 
-    class OutputSchema(BaseModel):
-        points: List[PointItem] = Field(description="List of detected objects.")
-        steps: List[str] = Field(description="List of steps.")
+    analysis_prompt = """\
+Inspect the provided image and infer a single high-level goal that represents the most reasonable outcome in the situation.
+Express the goal as a short imperative sentence grounded solely in the visual evidence.
 
-    image = get_image_resized("data/1.png")
+Identify the objects that are relevant to achieving the goal and provide their bounding boxes.
+Each detected object must be assigned a unique identifying label.
+Represent every bounding box using "box_2d": [ymin, xmin, ymax, xmax] with each coordinate normalized to the 0–1000 range (integers).
 
-    prompt = textwrap.dedent("""\
-        Our goal is to move objects (umbrellas, water bottles, glasses) in order to group similar items together.
+Return a JSON object structured as:
+{
+    "goal": <goal>,
+    "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...]
+}"""
 
-        Identify and point to relevant objects located near the center of the image.
-        Each detected object must be assigned a unique identifying label, such as "green umbrella". The answer should follow the json format: [{"point": <point>, "label": <label1>}, ...]. The points are in [y, x] format normalized to 0-1000.
-
-        Next, generate steps that describe the actions needed to achieve the goal.
-        For example: "Move the sunglasses to the right side". The answer should follow the json format: [<step>, ...].""")
-
-    text = client.models.generate_content(
+    analysis_text = client.models.generate_content(
         model="gemini-robotics-er-1.5-preview",
         contents=[
-            image,
-            prompt,
+            analysis_image,
+            analysis_prompt,
         ],
         config=types.GenerateContentConfig(
             temperature=0.5,
@@ -49,22 +79,120 @@ def plan():
                 thinking_budget=-1
             ),  # dynamic thinking
             response_mime_type="application/json",
-            response_json_schema=OutputSchema.model_json_schema(),
+            response_json_schema=AnalysisSchema.model_json_schema(),
         ),
     ).text
 
-    assert text is not None
+    assert analysis_text is not None
 
-    json = OutputSchema.model_validate_json(text)
+    analysis = AnalysisSchema.model_validate_json(analysis_text)
 
-    return json
+    cropped_assets = crop_and_save_objects(
+        original_image, analysis.objects, OBJECT_CROP_DIR
+    )
+    crop_images = [asset[1] for asset in cropped_assets]
+    resized_crop_images = resize_images(crop_images)
+
+    objects_summary = (
+        "\n".join(
+            f"{idx}. {obj.label} — box_2d {list(obj.box_2d)}"
+            for idx, obj in enumerate(analysis.objects, start=1)
+        )
+        if analysis.objects
+        else "No objects were detected in the first pass."
+    )
+
+    attachment_note = (
+        " and cropped close-up images for each listed object (these attachments follow the scene image in the same order)."
+        if crop_images
+        else ". No cropped close-up images are available; rely solely on the scene image."
+    )
+
+    steps_prompt = f"""\
+Initial goal: {analysis.goal}
+
+You are given the original scene image (first attachment){attachment_note}
+Use the initial goal, the object metadata, and any new evidence from the close-up crops to reason about the best final goal.
+
+Objects:
+{objects_summary}
+
+If the initial goal already fits, repeat it verbatim. Otherwise, refine it to something more appropriate now that you have detailed context.
+Produce an ordered list of clear, imperative manipulation steps that reference the object labels directly.
+Return JSON structured exactly as {{"goal": <final_goal>, "steps": [<step>, ...]}} with the goal field appearing before steps."""
+
+    print(steps_prompt)
+
+    step_contents = [analysis_image, *resized_crop_images, steps_prompt]
+
+    steps_text = client.models.generate_content(
+        model="gemini-robotics-er-1.5-preview",
+        contents=step_contents,
+        config=types.GenerateContentConfig(
+            temperature=0.5,
+            thinking_config=types.ThinkingConfig(thinking_budget=-1),
+            response_mime_type="application/json",
+            response_json_schema=StepsSchema.model_json_schema(),
+        ),
+    ).text
+
+    assert steps_text is not None
+
+    steps = StepsSchema.model_validate_json(steps_text)
+
+    return OutputSchema(goal=steps.goal, objects=analysis.objects, steps=steps.steps)
+
+
+def crop_and_save_objects(
+    image: Image.Image, objects: List[ObjectItem], dest_dir: Path
+) -> List[Tuple[ObjectItem, Image.Image, Path]]:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    width, height = image.size
+    assets: List[Tuple[ObjectItem, Image.Image, Path]] = []
+
+    for idx, obj in enumerate(objects, start=1):
+        ymin, xmin, ymax, xmax = obj.box_2d
+
+        y_min_px = clamp(normalized_to_pixels(ymin, height), 0, max(height - 1, 0))
+        y_max_px = clamp(normalized_to_pixels(ymax, height), 0, height)
+        x_min_px = clamp(normalized_to_pixels(xmin, width), 0, max(width - 1, 0))
+        x_max_px = clamp(normalized_to_pixels(xmax, width), 0, width)
+
+        if y_max_px <= y_min_px:
+            y_max_px = clamp(y_min_px + 1, 0, height)
+        if x_max_px <= x_min_px:
+            x_max_px = clamp(x_min_px + 1, 0, width)
+
+        crop = image.crop((x_min_px, y_min_px, x_max_px, y_max_px))
+        crop_path = dest_dir / f"object_{idx}_{slugify_label(obj.label)}.png"
+        crop.save(crop_path)
+        assets.append((obj, crop, crop_path))
+
+    return assets
+
+
+def normalized_to_pixels(value: float, size: int) -> int:
+    normalized = max(0.0, min(1000.0, float(value)))
+    return int(round((normalized / 1000.0) * size))
+
+
+def clamp(value: int, lower: int, upper: int) -> int:
+    if lower > upper:
+        return lower
+    return max(lower, min(value, upper))
+
+
+def slugify_label(label: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", label.lower())
+    slug = slug.strip("_")
+    return slug or "object"
 
 
 def banana():
-    prompt = textwrap.dedent("""\
-        Using the provided image, apply the following action to the scene: "Move the regular glasses next to the sunglasses."
+    prompt = """\
+Using the provided image, apply the following action to the scene: "Move the regular glasses next to the sunglasses."
 
-        Modify only what is necessary to perform this action. Keep all other elements of the image exactly the same.""")
+Modify only what is necessary to perform this action. Keep all other elements of the image exactly the same."""
 
     image = get_image_resized("data/1.png")
 
@@ -85,10 +213,18 @@ def banana():
 
 def get_image_resized(img_path: str):
     image = Image.open(img_path)
-    image = image.resize(
-        (800, int(800 * image.size[1] / image.size[0])), Image.Resampling.LANCZOS
-    )
-    return image
+    return resize_image(image)
+
+
+def resize_image(image: Image.Image, target_width: int = 1000) -> Image.Image:
+    target_height = int(target_width * image.size[1] / image.size[0])
+    return image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+
+def resize_images(
+    images: List[Image.Image], target_width: int = 1000
+) -> List[Image.Image]:
+    return [resize_image(image, target_width) for image in images]
 
 
 if __name__ == "__main__":
