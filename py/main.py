@@ -118,7 +118,7 @@ Objects:
 {objects_summary}
 
 If the initial goal already fits, repeat it verbatim. Otherwise, refine it to something more appropriate now that you have detailed context.
-Produce an ordered list of clear, imperative manipulation steps that reference the object labels directly.
+Produce an ordered list of detailed, clear, imperative manipulation steps that reference the object labels directly.
 Return JSON structured exactly as {{"goal": <final_goal>, "steps": [<step>, ...]}} with the goal field appearing before steps."""
 
     print(steps_prompt)
