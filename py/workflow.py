@@ -6,22 +6,17 @@ from google.genai import types
 from PIL import Image
 
 from shared import (
-    AnalysisSchema,
     BANANA_OUTPUT_PATH,
     CONTINUATION_BANANA_PATH,
     CONTINUATION_HIGHLIGHT_PATH,
     FIRST_STEP_HIGHLIGHT_PATH,
-    OBJECT_CROP_DIR,
     ObjectItem,
     OutputSchema,
     StepItem,
-    StepsSchema,
     banana,
     client,
-    crop_and_save_objects,
     highlight_first_step,
     resize_image,
-    resize_images,
 )
 
 
@@ -36,63 +31,31 @@ class WorkflowArtifacts:
 
 def generate_plan_from_image(image: Image.Image) -> WorkflowArtifacts:
     original_image = image.copy()
-    analysis_image = resize_image(original_image)
+    resized_image = resize_image(original_image)
 
-    analysis_text = client.models.generate_content(
+    plan_text = client.models.generate_content(
         model="gemini-robotics-er-1.5-preview",
-        contents=[analysis_image, ANALYSIS_PROMPT],
+        contents=[resized_image, PLAN_PROMPT],
         config=types.GenerateContentConfig(
             temperature=0.5,
             thinking_config=types.ThinkingConfig(thinking_budget=-1),
             response_mime_type="application/json",
-            response_json_schema=AnalysisSchema.model_json_schema(),
+            response_json_schema=OutputSchema.model_json_schema(),
         ),
     ).text
 
-    if analysis_text is None:
-        raise RuntimeError("Analysis model did not return any content.")
+    if plan_text is None:
+        raise RuntimeError("Plan model did not return any content.")
 
-    analysis = AnalysisSchema.model_validate_json(analysis_text)
-
-    cropped_assets = crop_and_save_objects(
-        original_image, analysis.objects, OBJECT_CROP_DIR
-    )
-    crop_images = [asset[1] for asset in cropped_assets]
-    resized_crop_images = resize_images(crop_images)
-
-    steps_prompt = _build_steps_prompt(analysis.goal, analysis.objects, crop_images)
-    step_contents = [analysis_image, *resized_crop_images, steps_prompt]
-
-    steps_text = client.models.generate_content(
-        model="gemini-robotics-er-1.5-preview",
-        contents=step_contents,
-        config=types.GenerateContentConfig(
-            temperature=0.5,
-            thinking_config=types.ThinkingConfig(thinking_budget=-1),
-            response_mime_type="application/json",
-            response_json_schema=StepsSchema.model_json_schema(),
-        ),
-    ).text
-
-    if steps_text is None:
-        raise RuntimeError("Steps model did not return any content.")
-
-    steps = StepsSchema.model_validate_json(steps_text)
+    plan = OutputSchema.model_validate_json(plan_text)
 
     highlight_path = highlight_first_step(
-        original_image, analysis.objects, steps.steps, FIRST_STEP_HIGHLIGHT_PATH
+        original_image, plan.objects, plan.steps, FIRST_STEP_HIGHLIGHT_PATH
     )
-    banana_path = _generate_banana_asset(
-        steps.steps, highlight_path, BANANA_OUTPUT_PATH
-    )
+    banana_path = _generate_banana_asset(plan.steps, highlight_path, BANANA_OUTPUT_PATH)
 
-    output = OutputSchema(
-        goal=steps.goal,
-        objects=analysis.objects,
-        steps=steps.steps,
-    )
     return WorkflowArtifacts(
-        output=output, highlight_path=highlight_path, banana_path=banana_path
+        output=plan, highlight_path=highlight_path, banana_path=banana_path
     )
 
 
@@ -196,7 +159,7 @@ def merge_objects_by_label(
     return merged
 
 
-ANALYSIS_PROMPT = """\
+PLAN_PROMPT = """\
 Inspect the provided image and infer a single high-level goal that represents the most reasonable outcome in the situation.
 Express the goal as a short imperative sentence grounded solely in the visual evidence.
 
@@ -204,46 +167,16 @@ Identify the objects that are relevant to achieving the goal and provide their b
 Each detected object must be assigned a unique identifying label.
 Represent every bounding box using "box_2d": [ymin, xmin, ymax, xmax] with each coordinate normalized to the 0–1000 range (integers).
 
-Return a JSON object structured as:
-{
-    "goal": <goal>,
-    "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...]
-}"""
+Return JSON structured exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>}, ...]}.
 
+Objects instructions:
+- List every relevant object with a unique label.
+- Represent bounding boxes using normalized integer coordinates spanning 0–1000 in [ymin, xmin, ymax, xmax] format.
 
-def _build_steps_prompt(
-    goal: str, objects: Sequence[ObjectItem], crop_images: Sequence[Image.Image]
-) -> str:
-    objects_summary = (
-        "\n".join(
-            f"{idx}. {obj.label} — box_2d {list(obj.box_2d)}"
-            if obj.box_2d is not None
-            else f"{idx}. {obj.label} — box_2d null"
-            for idx, obj in enumerate(objects, start=1)
-        )
-        if objects
-        else "No objects were detected in the first pass."
-    )
-
-    attachment_note = (
-        " and cropped close-up images for each listed object (these attachments follow the scene image in the same order)."
-        if crop_images
-        else ". No cropped close-up images are available; rely solely on the scene image."
-    )
-
-    return f"""\
-Initial goal: {goal}
-
-You are given the original scene image (first attachment){attachment_note}
-Use the initial goal, the object metadata, and any new evidence from the close-up crops to reason about the best final goal.
-
-Objects:
-{objects_summary}
-
-If the initial goal already fits, repeat it verbatim. Otherwise, refine it to something more appropriate now that you have detailed context.
-Produce an ordered list of detailed, clear, imperative manipulation steps that reference the object labels directly.
-For each step set "object_label" to the single most relevant label taken verbatim from the list above.
-Return JSON structured exactly as {{"goal": <final_goal>, "steps": [{{"text": <step_text>, "object_label": <object_label>}}, ...]}} with the goal field appearing before steps."""
+Steps instructions:
+- Produce an ordered list of clear, imperative manipulation steps necessary to accomplish the goal.
+- Reference objects directly in each step and set object_label to one of the previously listed labels verbatim.
+"""
 
 
 def _build_completion_prompt(existing: OutputSchema) -> str:
