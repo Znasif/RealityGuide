@@ -8,6 +8,8 @@ using PassthroughCameraSamples.CameraToWorld;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.UI;
+using Meta.WitAi.Dictation;
+using Oculus.Voice.Dictation;
 
 namespace PassthroughCameraSamples.ZeroShot
 {
@@ -22,6 +24,7 @@ namespace PassthroughCameraSamples.ZeroShot
 
         [SerializeField] private CameraToGemini m_cameraCanvas;
         [SerializeField] private float m_canvasDistance = 1f;
+        [SerializeField] private AppDictationExperience m_dictationExperience;
 
         [SerializeField] private Vector3 m_headSpaceDebugShift = new(0, -.15f, .4f);
         private GameObject m_rayGo1, m_rayGo2, m_rayGo3, m_rayGo4;
@@ -29,6 +32,7 @@ namespace PassthroughCameraSamples.ZeroShot
         private bool m_isDebugOn;
         private bool m_snapshotTaken;
         private OVRPose m_snapshotHeadPose;
+        private bool m_recordingOn = false;
 
         private void OnEnable() => OVRManager.display.RecenteredPose += RecenterCallBack;
 
@@ -59,8 +63,31 @@ namespace PassthroughCameraSamples.ZeroShot
             UpdateRaysRendering();
         }
 
+        public void record(string transcribedText)
+        {
+            m_cameraCanvas.dictationText = transcribedText;
+            Debug.Log($"Gemini-ready dictation: {m_cameraCanvas.dictationText}");
+        }
+
         private void Update()
         {
+            if(OVRInput.GetDown(OVRInput.RawButton.RIndexTrigger))
+            {
+                m_recordingOn = !m_recordingOn;
+                if (m_recordingOn)
+                {
+                    // If we are now recording, activate the dictation experience to start listening.
+                    Debug.Log("Starting Dictation...");
+                    m_dictationExperience.Activate();
+                }
+                else
+                {
+                    // If we are no longer recording, deactivate it to stop listening.
+                    Debug.Log("Stopping Dictation...");
+                    m_dictationExperience.Deactivate();
+                }
+            }
+
             if (OVRInput.GetDown(OVRInput.Button.One))
             {
                 m_snapshotTaken = !m_snapshotTaken;

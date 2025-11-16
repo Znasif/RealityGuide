@@ -5,6 +5,8 @@ using System.Collections;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Meta.WitAi.TTS.Interfaces;
+using Meta.WitAi.TTS.Utilities;
 using Meta.XR;
 using Meta.XR.Samples;
 using Newtonsoft.Json;
@@ -22,7 +24,10 @@ namespace PassthroughCameraSamples.ZeroShot
         [SerializeField] private string m_url = "https://flexible-loudly-polliwog.ngrok-free.app/";
         [SerializeField] private GameObject loadingIcon;
         private Texture2D m_cameraSnapshot;
+        private GeminiRoboticsPlanResponse planResponse;
         private string currentGoalId = "";
+        [SerializeField] private TTSSpeaker ttsSpeaker;
+        public string dictationText = "";
 
         // Make this an async void method to allow awaiting the network request
         // In your CameraCanvas class (assuming it's a MonoBehaviour)
@@ -104,6 +109,8 @@ namespace PassthroughCameraSamples.ZeroShot
                 {
                     Debug.Log("Request successful. Updating texture.");
                     m_image.texture = highlightedTexture;
+                    m_debugText.text = planResponse.Plan.Steps[0].Text;
+                    ttsSpeaker.Speak(planResponse.Plan.Steps[0].Text);
                 }
                 else
                 {
@@ -139,6 +146,8 @@ namespace PassthroughCameraSamples.ZeroShot
                 {
                     Debug.Log("Request successful. Updating texture.");
                     m_image.texture = highlightedTexture;
+                    if(planResponse.Plan.Steps.Count > 0) { m_debugText.text = planResponse.Plan.Steps[0].Text; ttsSpeaker.Speak(planResponse.Plan.Steps[0].Text); }
+                    else { m_debugText.text = "You've completed all steps. Press A to start again."; ttsSpeaker.Speak("You've completed all steps. Press A to start again."); }
                 }
                 else
                 {
@@ -161,7 +170,7 @@ namespace PassthroughCameraSamples.ZeroShot
                 yield return null;
             }
             m_image.texture = m_cameraAccess.GetTexture();
-            if(currentGoalId!="") m_debugText.text = "Press B once you are ready for next step..";
+            if (currentGoalId != "") m_debugText.text = "Press B once you are ready for next step..";
         }
 
         private IEnumerator Start()
@@ -221,7 +230,7 @@ namespace PassthroughCameraSamples.ZeroShot
                     response.EnsureSuccessStatusCode(); // Throws an exception if the response is not successful
 
                     string jsonString = await response.Content.ReadAsStringAsync();
-                    GeminiRoboticsPlanResponse planResponse = JsonConvert.DeserializeObject<GeminiRoboticsPlanResponse>(jsonString);
+                    planResponse = JsonConvert.DeserializeObject<GeminiRoboticsPlanResponse>(jsonString);
                     Debug.Log($"The first step in Gemini: {planResponse.Plan.Steps[0].Text}");
                     currentGoalId = planResponse.Id;
 
@@ -273,11 +282,11 @@ namespace PassthroughCameraSamples.ZeroShot
                 // Add error handling for the web request
                 try
                 {
-                    HttpResponseMessage response = await client.PutAsync(m_url + "goals/" +id, content);
+                    HttpResponseMessage response = await client.PutAsync(m_url + "goals/" + id, content);
                     response.EnsureSuccessStatusCode(); // Throws an exception if the response is not successful
 
                     string jsonString = await response.Content.ReadAsStringAsync();
-                    GeminiRoboticsPlanResponse planResponse = JsonConvert.DeserializeObject<GeminiRoboticsPlanResponse>(jsonString);
+                    planResponse = JsonConvert.DeserializeObject<GeminiRoboticsPlanResponse>(jsonString);
                     Debug.Log($"The next step is: {planResponse.Plan.Steps[0].Text}");
 
                     if (!string.IsNullOrEmpty(planResponse.HighlightImageBase64))
