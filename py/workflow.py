@@ -69,7 +69,7 @@ def refresh_plan_from_image(
         model="gemini-robotics-er-1.5-preview",
         contents=[resized_image, completion_prompt],
         config=types.GenerateContentConfig(
-            temperature=0.3,
+            temperature=0.5,
             thinking_config=types.ThinkingConfig(thinking_budget=-1),
             response_mime_type="application/json",
             response_json_schema=OutputSchema.model_json_schema(),
@@ -155,20 +155,13 @@ def merge_objects_by_label(
 
 
 PLAN_PROMPT = """\
-Inspect the provided image, and list the objects the robot should manipulate.
+Mission: group functionally similar objects together.
 
-Goal: Group functionally similar objects together, so matching things end up near each other.
+Return JSON exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>, "trajectory": [{"point": [y, x]}, ...]}, ...]}.
 
-Objects instructions:
-- Identify every relevant object with a unique descriptive label.
-- Represent each bounding box as normalized integers [ymin, xmin, ymax, xmax] spanning 0–1000.
-
-Steps instructions:
-- Produce a concise ordered list of imperative actions that move one object closer to its similar object.
-- Reference objects directly in each step and set object_label to one of the previously listed labels verbatim.
-- Provide "trajectory": [{"point": [y, x]}, ...] for the first step in the list. Use up to 5 normalized waypoint pairs (0–1000 integers) showing how to move that object toward its destination.
-
-Return JSON structured exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>, "trajectory": [{"point": [y, x]}, ...]}, ...]}.
+- goal: always set to "Group functionally similar objects together."
+- objects: list every relevant item with a unique label and normalized integer box [ymin, xmin, ymax, xmax] spanning 0–1000.
+- steps: write a short imperative that moves one object toward its matching group, referencing the label verbatim. Only the first step may include up to 5 normalized [y, x] waypoint pairs as trajectory moving towards destination.
 """
 
 
@@ -183,24 +176,20 @@ Objects reference list:
 Prior ordered steps:
 {summarize_steps(existing.steps)}
 
-Look at the updated scene image (attachment) and determine which steps have been completed.
-Keep the reorganizing task focused on consolidating similar objects into tidy clusters by moving matching items closer together.
-Objects instructions:
-- For each label above (and in the same order), inspect the latest image and provide its bounding box as normalized integers in [ymin, xmin, ymax, xmax] format spanning 0–1000.
-- Do not introduce new labels or reorder them. When an object is not visible, set its box_2d to null.
+Review the new image and update the plan while keeping the same mission.
 
-Steps instructions:
-- For each existing step, keep its object_label identical.
-- When a step is fully satisfied, prefix its text with "[DONE] " but keep the rest of the wording short.
-- For steps that still require work, rewrite the text so it reflects what remains.
-- Maintain the execution order from top to bottom so the robot knows what to do next.
-- Add new steps at the end only if more actions are required to finish the unchanged goal. Use an object_label from the reference list; never invent new labels.
-- Provide "trajectory": [{{"point": [y, x]}}, ...] only for the first step that is not already prefixed with "[DONE]". Use up to 10 normalized waypoint pairs (0–1000 integers) that describe how to move that object toward its intended group. For all other steps—whether completed or pending—set "trajectory": [] so the schema stays uniform.
+Objects:
+- Follow the reference order above.
+- Give each label a normalized [ymin, xmin, ymax, xmax] box (0–1000 integers) or null if hidden.
 
-Return JSON structured exactly as {{"goal": <goal>, "objects": [{{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax] or null}}, ...], "steps": [{{"text": <step>, "object_label": <label>, "trajectory": [{{"point": [y, x]}}, ...]}}, ...]}} with the goal field appearing before objects.
+Steps:
+- Keep every object_label exactly the same as before.
+- Completed steps: prefix with "[DONE] " and keep the remaining text short.
+- Preserve ordering and append new steps only if more actions are still needed, using existing labels only.
+- Provide trajectory waypoints only for the first step that is not prefixed with "[DONE]"; use up to 5 normalized [y, x] pairs. Set trajectory to [] for all other steps.
+
+Return JSON structured exactly as {{"goal": <goal>, "objects": [{{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax] or null}}, ...], "steps": [{{"text": <step>, "object_label": <label>, "trajectory": [{{"point": [y, x]}}, ...]}}, ...]}}.
 The "goal" field MUST be exactly: {existing.goal}
-
-If no steps were provided previously, create a fresh ordered list that the robot can follow from the current state to finish the goal.
 """
 
 
