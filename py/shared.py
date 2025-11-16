@@ -13,6 +13,8 @@ client = genai.Client()
 OBJECT_CROP_DIR = Path("data/object_crops")
 FIRST_STEP_HIGHLIGHT_PATH = Path("data/first_step_highlight.png")
 BANANA_OUTPUT_PATH = Path("data/first_step_banana.png")
+CONTINUATION_HIGHLIGHT_PATH = Path("data/continuation_first_step_highlight.png")
+CONTINUATION_BANANA_PATH = Path("data/continuation_first_step_banana.png")
 
 
 class ObjectItem(BaseModel):
