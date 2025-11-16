@@ -154,22 +154,21 @@ def merge_objects_by_label(
 
 
 PLAN_PROMPT = """\
-Inspect the provided image and infer a single high-level goal that represents the most reasonable outcome in the situation.
-Express the goal as a short imperative sentence grounded solely in the visual evidence.
+Inspect the provided image and infer a single high-level goal that describes reorganizing the scene by grouping visually or functionally similar objects together. The robot should move matching items closer so that related things form tidy clusters.
 
-Identify the objects that are relevant to achieving the goal and provide their bounding boxes.
-Each detected object must be assigned a unique identifying label.
-Represent every bounding box using "box_2d": [ymin, xmin, ymax, xmax] with each coordinate normalized to the 0–1000 range (integers).
-
-Return JSON structured exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>}, ...]}.
+Goal instructions:
+- Express the goal as a short imperative sentence that explicitly mentions organizing or grouping similar items based solely on the visual evidence.
 
 Objects instructions:
-- List every relevant object with a unique label.
+- Identify every object that matters for forming the groups and assign each one a unique label.
 - Represent bounding boxes using normalized integer coordinates spanning 0–1000 in [ymin, xmin, ymax, xmax] format.
 
 Steps instructions:
-- Produce an ordered list of clear, imperative manipulation steps necessary to accomplish the goal.
+- Produce an ordered list of clear, imperative manipulation steps that move objects into proximity with the similar items they belong with.
 - Reference objects directly in each step and set object_label to one of the previously listed labels verbatim.
+- For every step, include "trajectory": [{"point": [y, x]}, ...] describing up to 10 normalized waypoint pairs (0–1000 integers) charting the motion path toward the destination cluster. Use an empty array when no motion is required.
+
+Return JSON structured exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>, "trajectory": [{"point": [y, x]}, ...]}, ...]}.
 """
 
 
@@ -185,6 +184,7 @@ Prior ordered steps:
 {summarize_steps(existing.steps)}
 
 Look at the updated scene image (attachment) and determine which steps have been completed.
+Keep the reorganizing task focused on consolidating similar objects into tidy clusters by moving matching items closer together.
 Objects instructions:
 - For each label above (and in the same order), inspect the latest image and provide its bounding box as normalized integers in [ymin, xmin, ymax, xmax] format spanning 0–1000.
 - Do not introduce new labels or reorder them. When an object is not visible, set its box_2d to null.
@@ -195,8 +195,9 @@ Steps instructions:
 - For steps that still require work, rewrite the text so it reflects what remains.
 - Maintain the execution order from top to bottom so the robot knows what to do next.
 - Add new steps at the end only if more actions are required to finish the unchanged goal. Use an object_label from the reference list; never invent new labels.
+- Provide "trajectory": [{{"point": [y, x]}}, ...] for every step, using up to 10 normalized waypoint pairs (0–1000 integers) that describe how to move the object toward its intended group. Use an empty array when a step is already satisfied or requires no additional motion.
 
-Return JSON structured exactly as {{"goal": <goal>, "objects": [{{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax] or null}}, ...], "steps": [{{"text": <step>, "object_label": <label>}}, ...]}} with the goal field appearing before objects.
+Return JSON structured exactly as {{"goal": <goal>, "objects": [{{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax] or null}}, ...], "steps": [{{"text": <step>, "object_label": <label>, "trajectory": [{{"point": [y, x]}}, ...]}}, ...]}} with the goal field appearing before objects.
 The "goal" field MUST be exactly: {existing.goal}
 
 If no steps were provided previously, create a fresh ordered list that the robot can follow from the current state to finish the goal.

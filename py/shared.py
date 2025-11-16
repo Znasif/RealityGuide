@@ -31,10 +31,21 @@ class AnalysisSchema(BaseModel):
     objects: List[ObjectItem] = Field(description="List of detected objects.")
 
 
+class TrajectoryPoint(BaseModel):
+    point: Tuple[int, int] = Field(
+        description="Normalized [y, x] waypoint in the 0–1000 range."
+    )
+
+
 class StepItem(BaseModel):
     text: str = Field(description="Detailed manipulation instruction.")
     object_label: str = Field(
         description="Label of the primary object mentioned in this step."
+    )
+    trajectory: Optional[List[TrajectoryPoint]] = Field(
+        default=None,
+        max_length=10,
+        description="Optional path for moving the object, expressed as up to 10 normalized [y, x] points.",
     )
 
 
@@ -112,6 +123,15 @@ def normalized_box_to_pixel_box(
         box_2d, width, height
     )
     return y_min_px, x_min_px, y_max_px, x_max_px
+
+
+def normalized_point_to_pixels(
+    point: Tuple[int, int], width: int, height: int
+) -> Tuple[int, int]:
+    y_normalized, x_normalized = point
+    y_px = clamp(normalized_to_pixels(y_normalized, height), 0, height)
+    x_px = clamp(normalized_to_pixels(x_normalized, width), 0, width)
+    return x_px, y_px
 
 
 def objects_with_pixel_boxes(
@@ -199,6 +219,31 @@ def highlight_first_step(
     draw.rectangle(
         (x_min_px, y_min_px, x_max_px, y_max_px), outline="red", width=stroke_width
     )
+
+    trajectory_points = []
+    if first_step.trajectory:
+        for point in first_step.trajectory[:10]:
+            if point.point is None:
+                continue
+            x_px, y_px = normalized_point_to_pixels(point.point, width, height)
+            trajectory_points.append((x_px, y_px))
+
+    if trajectory_points:
+        draw.line(trajectory_points, fill="yellow", width=stroke_width)
+        marker_radius = max(2, stroke_width)
+        for idx, (x, y) in enumerate(trajectory_points):
+            marker_color = "yellow" if idx == len(trajectory_points) - 1 else "orange"
+            draw.ellipse(
+                (
+                    x - marker_radius,
+                    y - marker_radius,
+                    x + marker_radius,
+                    y + marker_radius,
+                ),
+                outline="black",
+                fill=marker_color,
+                width=1,
+            )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     annotated.save(output_path)
