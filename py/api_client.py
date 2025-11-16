@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib import error, request
 
+BASE64_PLACEHOLDER = "<omitted base64 image>"
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Interact with the RealityGuide API.")
@@ -29,7 +31,8 @@ def main() -> None:
         goal_id=args.goal_id,
         payload=payload,
     )
-    print(json.dumps(response, indent=2))
+    redacted = _redact_base64_images(response)
+    print(json.dumps(redacted, indent=2))
 
 
 def _encode_image(image_path: Path) -> str:
@@ -58,6 +61,29 @@ def _send_request(
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
         raise SystemExit(f"Request failed with status {exc.code}: {detail}") from exc
+
+
+def _redact_base64_images(data: Any) -> Any:
+    if isinstance(data, dict):
+        redacted: dict[str, Any] = {}
+        for key, value in data.items():
+            if _should_redact_key(key, value):
+                redacted[key] = BASE64_PLACEHOLDER
+            else:
+                redacted[key] = _redact_base64_images(value)
+        return redacted
+    if isinstance(data, list):
+        return [_redact_base64_images(item) for item in data]
+    return data
+
+
+def _should_redact_key(key: Any, value: Any) -> bool:
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    if "image" not in lowered:
+        return False
+    return "base64" in lowered
 
 
 if __name__ == "__main__":
