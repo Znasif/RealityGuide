@@ -97,6 +97,9 @@ def refresh_plan_from_image(
         CONTINUATION_HIGHLIGHT_PATH,
     )
 
+    if highlight_path is None:
+        highlight_path = CONTINUATION_HIGHLIGHT_PATH
+
     return WorkflowArtifacts(
         output=updated_output, highlight_path=highlight_path, banana_path=highlight_path
     )
