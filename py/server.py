@@ -40,6 +40,16 @@ def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# FIXME: copied from create_goal()
+@app.post("/", response_model=GoalResponse)
+def tmp(payload: GoalImageRequest) -> GoalResponse:
+    image = _decode_base64_image(payload.image_base64)
+    artifacts = generate_plan_from_image(image)
+    goal_id = uuid4().hex
+    _persist_goal(goal_id, artifacts.output)
+    return _build_response(goal_id, artifacts)
+
+
 @app.post("/goals", response_model=GoalResponse)
 def create_goal(payload: GoalImageRequest) -> GoalResponse:
     image = _decode_base64_image(payload.image_base64)
