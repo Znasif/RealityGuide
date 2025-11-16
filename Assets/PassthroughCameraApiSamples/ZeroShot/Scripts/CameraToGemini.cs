@@ -110,7 +110,7 @@ namespace PassthroughCameraSamples.ZeroShot
                     Debug.Log("Request successful. Updating texture.");
                     m_image.texture = highlightedTexture;
                     m_debugText.text = planResponse.Plan.Steps[0].Text;
-                    ttsSpeaker.Speak(planResponse.Plan.Steps[0].Text);
+                    //ttsSpeaker.Speak(planResponse.Plan.Steps[0].Text);
                 }
                 else
                 {
@@ -146,8 +146,12 @@ namespace PassthroughCameraSamples.ZeroShot
                 {
                     Debug.Log("Request successful. Updating texture.");
                     m_image.texture = highlightedTexture;
-                    if(planResponse.Plan.Steps.Count > 0) { m_debugText.text = planResponse.Plan.Steps[0].Text; ttsSpeaker.Speak(planResponse.Plan.Steps[0].Text); }
-                    else { m_debugText.text = "You've completed all steps. Press A to start again."; ttsSpeaker.Speak("You've completed all steps. Press A to start again."); }
+                    if(planResponse.Plan.Steps.Count > 0){ 
+                        m_debugText.text = planResponse.Plan.Steps[0].Text;
+                    }
+                    else{ 
+                        m_debugText.text = "You've completed all steps. Press A to start again."; 
+                    }
                 }
                 else
                 {
@@ -217,6 +221,7 @@ namespace PassthroughCameraSamples.ZeroShot
 
                 var payload = new
                 {
+                    prompt = dictationText,
                     image_base64 = base64Image
                 };
 
@@ -273,6 +278,7 @@ namespace PassthroughCameraSamples.ZeroShot
 
                 var payload = new
                 {
+                    prompt = dictationText,
                     image_base64 = base64Image
                 };
 
