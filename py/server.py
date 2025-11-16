@@ -24,6 +24,7 @@ GOALS_DIR = Path("goals")
 DATA_DIR = Path("data")
 LATEST_TMP_IMAGE_PATH = DATA_DIR / "latest_root_request.png"
 LATEST_GOALS_IMAGE_PATH = DATA_DIR / "latest_goals_request.png"
+LATEST_GOALS_UPDATE_IMAGE_PATH = DATA_DIR / "latest_goals_update_request.png"
 GOAL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
@@ -74,6 +75,7 @@ def update_goal(goal_id: str, payload: GoalImageRequest) -> GoalResponse:
 
     existing = OutputSchema.model_validate_json(goal_path.read_text())
     image = _decode_base64_image(payload.image_base64)
+    _save_latest_image(image, LATEST_GOALS_UPDATE_IMAGE_PATH)
     artifacts = refresh_plan_from_image(image, existing)
     _persist_goal(goal_id, artifacts.output)
     return _build_response(goal_id, artifacts, image.size)
