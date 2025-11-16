@@ -92,3 +92,12 @@ uv run --env-file .env main.py sample/1.jpg
   ]
 }
 ```
+
+**Next Command**:
+```
+uv run --env-file .env check_completion.py new-state-image.jpg current.json
+```
+
+**Next Output Image**:
+
+<img src="https://github.com/user-attachments/assets/cebbd5a4-7203-4bc4-8532-fd58d5869b4d" width="400" />
