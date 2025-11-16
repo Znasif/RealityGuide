@@ -70,7 +70,7 @@ class OutputSchema(BaseModel):
     )
 
 
-def resize_image(image: Image.Image, target_width: int = 1000) -> Image.Image:
+def resize_image(image: Image.Image, target_width: int = 1600) -> Image.Image:
     target_height = int(target_width * image.size[1] / image.size[0])
     return image.resize((target_width, target_height), Image.Resampling.LANCZOS)
 

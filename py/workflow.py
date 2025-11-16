@@ -155,19 +155,18 @@ def merge_objects_by_label(
 
 
 PLAN_PROMPT = """\
-Inspect the provided image and infer a single high-level goal that describes reorganizing the scene by grouping visually or functionally similar objects together. The robot should move matching items closer so that related things form tidy clusters.
+Inspect the provided image, and list the objects the robot should manipulate.
 
-Goal instructions:
-- Express the goal as a short imperative sentence that explicitly mentions organizing or grouping similar items based solely on the visual evidence.
+Goal: Group functionally similar objects together, so matching things end up near each other.
 
 Objects instructions:
-- Identify every object that matters for forming the groups and assign each one a unique label.
-- Represent bounding boxes using normalized integer coordinates spanning 0–1000 in [ymin, xmin, ymax, xmax] format.
+- Identify every relevant object with a unique descriptive label.
+- Represent each bounding box as normalized integers [ymin, xmin, ymax, xmax] spanning 0–1000.
 
 Steps instructions:
-- Produce an ordered list of clear, imperative manipulation steps that move objects into proximity with the similar items they belong with.
+- Produce a concise ordered list of imperative actions that move one object closer to its similar object.
 - Reference objects directly in each step and set object_label to one of the previously listed labels verbatim.
-- For only the first step in the ordered list, include "trajectory": [{"point": [y, x]}, ...] describing up to 10 normalized waypoint pairs (0–1000 integers) charting how to move that object toward its destination cluster. For all later steps, set "trajectory": [] so the structure stays consistent.
+- Provide "trajectory": [{"point": [y, x]}, ...] for the first step in the list. Use up to 5 normalized waypoint pairs (0–1000 integers) showing how to move that object toward its destination.
 
 Return JSON structured exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>, "trajectory": [{"point": [y, x]}, ...]}, ...]}.
 """
@@ -192,7 +191,7 @@ Objects instructions:
 
 Steps instructions:
 - For each existing step, keep its object_label identical.
-- When a step is fully satisfied, prefix its text with "[DONE] " but keep the rest of the wording.
+- When a step is fully satisfied, prefix its text with "[DONE] " but keep the rest of the wording short.
 - For steps that still require work, rewrite the text so it reflects what remains.
 - Maintain the execution order from top to bottom so the robot knows what to do next.
 - Add new steps at the end only if more actions are required to finish the unchanged goal. Use an object_label from the reference list; never invent new labels.
