@@ -17,18 +17,21 @@ Learn more about the project: [AGENTS.md](AGENTS.md)
 
 ## Example result
 
-Command:
+**Command**:
 ```
 uv run --env-file .env main.py sample/1.jpg
 ```
 
-Input Image:
-![](./sample/1.jpg)
+**Input Image**:
 
-Output Image:
-![](./sample/1.jpg)
+<img src="sample/1.jpg" width="400" />
 
-Output JSON:
+**Output Image**:
+
+<img src="https://github.com/user-attachments/assets/91be5d22-854a-48fe-b203-d73249ab1370" width="400" />
+
+**Output JSON**:
+
 ```json
 {
   "goal": "Prepare and heat the food package in the microwave.",
