@@ -13,6 +13,7 @@ from PIL import Image, UnidentifiedImageError
 from shared import OutputSchema, output_with_pixel_boxes
 from workflow import (
     WorkflowArtifacts,
+    actionable_steps,
     generate_plan_from_image,
     refresh_plan_from_image,
 )
@@ -124,9 +125,14 @@ def _build_response(
     pixel_aligned_output = output_with_pixel_boxes(
         artifacts.output, width=width, height=height
     )
+    actionable_plan = OutputSchema(
+        goal=pixel_aligned_output.goal,
+        objects=pixel_aligned_output.objects,
+        steps=actionable_steps(pixel_aligned_output.steps),
+    )
     return GoalResponse(
         id=goal_id,
-        plan=pixel_aligned_output,
+        plan=actionable_plan,
         highlight_image_base64=_encode_file_as_base64(artifacts.highlight_path),
         banana_image_base64=_encode_file_as_base64(artifacts.banana_path),
     )
