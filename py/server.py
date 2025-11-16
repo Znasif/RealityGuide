@@ -21,6 +21,9 @@ from workflow import (
 app = FastAPI(title="RealityGuide API")
 
 GOALS_DIR = Path("goals")
+DATA_DIR = Path("data")
+LATEST_TMP_IMAGE_PATH = DATA_DIR / "latest_root_request.png"
+LATEST_GOALS_IMAGE_PATH = DATA_DIR / "latest_goals_request.png"
 GOAL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
@@ -44,6 +47,7 @@ def healthcheck() -> dict[str, str]:
 @app.post("/", response_model=GoalResponse)
 def tmp(payload: GoalImageRequest) -> GoalResponse:
     image = _decode_base64_image(payload.image_base64)
+    _save_latest_image(image, LATEST_TMP_IMAGE_PATH)
     artifacts = generate_plan_from_image(image)
     goal_id = uuid4().hex
     _persist_goal(goal_id, artifacts.output)
@@ -53,6 +57,7 @@ def tmp(payload: GoalImageRequest) -> GoalResponse:
 @app.post("/goals", response_model=GoalResponse)
 def create_goal(payload: GoalImageRequest) -> GoalResponse:
     image = _decode_base64_image(payload.image_base64)
+    _save_latest_image(image, LATEST_GOALS_IMAGE_PATH)
     artifacts = generate_plan_from_image(image)
     goal_id = uuid4().hex
     _persist_goal(goal_id, artifacts.output)
@@ -121,3 +126,8 @@ def _encode_file_as_base64(path: Optional[Path]) -> Optional[str]:
     if not path or not path.is_file():
         return None
     return base64.b64encode(path.read_bytes()).decode("ascii")
+
+
+def _save_latest_image(image: Image.Image, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    image.save(destination, format="PNG")
