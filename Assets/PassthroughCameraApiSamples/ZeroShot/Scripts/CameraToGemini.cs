@@ -225,6 +225,8 @@ namespace PassthroughCameraSamples.ZeroShot
                     image_base64 = base64Image
                 };
 
+                dictationText = ""; // Clear dictation text after sending
+
                 string jsonContent = JsonConvert.SerializeObject(payload);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
@@ -281,6 +283,8 @@ namespace PassthroughCameraSamples.ZeroShot
                     prompt = dictationText,
                     image_base64 = base64Image
                 };
+
+                dictationText = ""; // Clear dictation text after sending
 
                 string jsonContent = JsonConvert.SerializeObject(payload);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
