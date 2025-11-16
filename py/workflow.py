@@ -6,8 +6,6 @@ from google.genai import types
 from PIL import Image
 
 from shared import (
-    BANANA_OUTPUT_PATH,
-    CONTINUATION_BANANA_PATH,
     CONTINUATION_HIGHLIGHT_PATH,
     FIRST_STEP_HIGHLIGHT_PATH,
     ObjectItem,
@@ -52,10 +50,9 @@ def generate_plan_from_image(image: Image.Image) -> WorkflowArtifacts:
     highlight_path = highlight_first_step(
         original_image, plan.objects, plan.steps, FIRST_STEP_HIGHLIGHT_PATH
     )
-    banana_path = _generate_banana_asset(plan.steps, highlight_path, BANANA_OUTPUT_PATH)
 
     return WorkflowArtifacts(
-        output=plan, highlight_path=highlight_path, banana_path=banana_path
+        output=plan, highlight_path=highlight_path, banana_path=highlight_path
     )
 
 
@@ -98,12 +95,9 @@ def refresh_plan_from_image(
         remaining_steps,
         CONTINUATION_HIGHLIGHT_PATH,
     )
-    banana_path = _generate_banana_asset(
-        remaining_steps, highlight_path, CONTINUATION_BANANA_PATH
-    )
 
     return WorkflowArtifacts(
-        output=updated_output, highlight_path=highlight_path, banana_path=banana_path
+        output=updated_output, highlight_path=highlight_path, banana_path=highlight_path
     )
 
 
