@@ -30,6 +30,7 @@ GOAL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 class GoalImageRequest(BaseModel):
+    prompt: str
     image_base64: str
 
 

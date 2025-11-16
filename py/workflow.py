@@ -184,7 +184,7 @@ Objects:
 
 Steps:
 - Keep every object_label exactly the same as before.
-- Completed steps: prefix with "[DONE] " and keep the remaining text short.
+- Completed steps: prefix with "[DONE] " and keep the remaining text short. For steps involving moving an object closer, the step is considered complete if the objects are approximately close; they do not need to be touching.
 - Preserve ordering and append new steps only if more actions are still needed, using existing labels only.
 - Provide trajectory waypoints only for the first step that is not prefixed with "[DONE]"; use up to 5 normalized [y, x] pairs. Set trajectory to [] for all other steps.
 
