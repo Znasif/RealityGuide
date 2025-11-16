@@ -87,7 +87,7 @@ namespace PassthroughCameraSamples.ZeroShot
 
         private IEnumerator SendGoalAndUpdateTextureCoroutine(Texture2D snapshot)
         {
-            Debug.Log("Starting network request...");
+            Debug.Log($"Starting network request Gemini for id: {currentGoalId}");
             // You could show a loading spinner UI here
 
             // Call the async method, which returns a Task immediately
@@ -97,10 +97,13 @@ namespace PassthroughCameraSamples.ZeroShot
             // without blocking the main thread (the game).
             yield return new WaitUntil(() => textureTask.IsCompleted);
 
+            Debug.Log($"Network request for Gemini completed for id: {currentGoalId}");
+
             // Now that the task is done, check for errors and get the result
             if (textureTask.IsFaulted)
             {
-                Debug.LogError("Network request failed: " + textureTask.Exception.Message);
+                Debug.LogError("Network request failed for Gemini: " + textureTask.Exception.Message);
+                m_debugText.text = "You've completed all steps. Press A to start again.";
             }
             else
             {
@@ -114,7 +117,8 @@ namespace PassthroughCameraSamples.ZeroShot
                 }
                 else
                 {
-                    Debug.LogWarning("Request completed, but no highlight texture was returned.");
+                    Debug.LogWarning("Request completed, but no highlight texture was returned. Gemini");
+                    m_debugText.text = "You've completed all steps. Press A to start again.";
                 }
             }
 
@@ -124,7 +128,7 @@ namespace PassthroughCameraSamples.ZeroShot
         // In your CameraCanvas class
         private IEnumerator SendRequestAndUpdateTextureCoroutine(Texture2D snapshot)
         {
-            Debug.Log("Starting network request...");
+            Debug.Log($"Starting network request Gemini for id: {currentGoalId}");
             // You could show a loading spinner UI here
 
             // Call the async method, which returns a Task immediately
@@ -134,17 +138,20 @@ namespace PassthroughCameraSamples.ZeroShot
             // without blocking the main thread (the game).
             yield return new WaitUntil(() => textureTask.IsCompleted);
 
+            Debug.Log($"Network request for Gemini completed for id: {currentGoalId}");
+
             // Now that the task is done, check for errors and get the result
             if (textureTask.IsFaulted)
             {
-                Debug.LogError("Network request failed: " + textureTask.Exception.Message);
+                Debug.LogError("Network request failed for Gemini: " + textureTask.Exception.Message);
+                m_debugText.text = "You've completed all steps. Press A to start again.";
             }
             else
             {
                 Texture2D highlightedTexture = textureTask.Result;
                 if (highlightedTexture != null)
                 {
-                    Debug.Log("Request successful. Updating texture.");
+                    Debug.Log("Request successful with Gemini. Updating texture.");
                     m_image.texture = highlightedTexture;
                     if(planResponse.Plan.Steps.Count > 0){ 
                         m_debugText.text = planResponse.Plan.Steps[0].Text;
@@ -155,7 +162,8 @@ namespace PassthroughCameraSamples.ZeroShot
                 }
                 else
                 {
-                    Debug.LogWarning("Request completed, but no highlight texture was returned.");
+                    Debug.LogWarning("Request completed, but no highlight texture was returned. Gemini");
+                    m_debugText.text = "You've completed all steps. Press A to start again.";
                 }
             }
 
