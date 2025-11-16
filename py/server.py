@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from PIL import Image, UnidentifiedImageError
 
-from shared import OutputSchema
+from shared import OutputSchema, output_with_pixel_boxes
 from workflow import (
     WorkflowArtifacts,
     generate_plan_from_image,
@@ -51,7 +51,7 @@ def tmp(payload: GoalImageRequest) -> GoalResponse:
     artifacts = generate_plan_from_image(image)
     goal_id = uuid4().hex
     _persist_goal(goal_id, artifacts.output)
-    return _build_response(goal_id, artifacts)
+    return _build_response(goal_id, artifacts, image.size)
 
 
 @app.post("/goals", response_model=GoalResponse)
@@ -61,7 +61,7 @@ def create_goal(payload: GoalImageRequest) -> GoalResponse:
     artifacts = generate_plan_from_image(image)
     goal_id = uuid4().hex
     _persist_goal(goal_id, artifacts.output)
-    return _build_response(goal_id, artifacts)
+    return _build_response(goal_id, artifacts, image.size)
 
 
 @app.put("/goals/{goal_id}", response_model=GoalResponse)
@@ -74,7 +74,7 @@ def update_goal(goal_id: str, payload: GoalImageRequest) -> GoalResponse:
     image = _decode_base64_image(payload.image_base64)
     artifacts = refresh_plan_from_image(image, existing)
     _persist_goal(goal_id, artifacts.output)
-    return _build_response(goal_id, artifacts)
+    return _build_response(goal_id, artifacts, image.size)
 
 
 def _decode_base64_image(data: str) -> Image.Image:
@@ -113,10 +113,16 @@ def _goal_path(goal_id: str) -> Path:
     return GOALS_DIR / f"{sanitized}.json"
 
 
-def _build_response(goal_id: str, artifacts: WorkflowArtifacts) -> GoalResponse:
+def _build_response(
+    goal_id: str, artifacts: WorkflowArtifacts, image_size: tuple[int, int]
+) -> GoalResponse:
+    width, height = image_size
+    pixel_aligned_output = output_with_pixel_boxes(
+        artifacts.output, width=width, height=height
+    )
     return GoalResponse(
         id=goal_id,
-        plan=artifacts.output,
+        plan=pixel_aligned_output,
         highlight_image_base64=_encode_file_as_base64(artifacts.highlight_path),
         banana_image_base64=_encode_file_as_base64(artifacts.banana_path),
     )

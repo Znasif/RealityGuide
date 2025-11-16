@@ -40,6 +40,8 @@ RealityGuide can also run as a FastAPI service that mirrors the CLI behavior.
 
 `highlight_image_base64` and `banana_image_base64` may be `null` when no artifact was produced. All image payloads may optionally use the `data:image/...;base64,` prefix.
 
+API responses report each object's `box_2d` in pixel coordinates relative to the image that was supplied in that request. Internally (and in the CLI JSON files consumed by `check_completion.py`) the workflow still tracks normalized 0–1000 values so follow-up runs remain compatible.
+
 ## Example result
 
 **Command**:

@@ -105,6 +105,35 @@ def normalized_box_to_pixels(
     return x_min_px, y_min_px, x_max_px, y_max_px
 
 
+def normalized_box_to_pixel_box(
+    box_2d: Tuple[int, int, int, int], width: int, height: int
+) -> Tuple[int, int, int, int]:
+    x_min_px, y_min_px, x_max_px, y_max_px = normalized_box_to_pixels(
+        box_2d, width, height
+    )
+    return y_min_px, x_min_px, y_max_px, x_max_px
+
+
+def objects_with_pixel_boxes(
+    objects: List[ObjectItem], width: int, height: int
+) -> List[ObjectItem]:
+    return [
+        ObjectItem(
+            label=obj.label,
+            box_2d=normalized_box_to_pixel_box(obj.box_2d, width, height),
+        )
+        for obj in objects
+    ]
+
+
+def output_with_pixel_boxes(
+    output: OutputSchema, width: int, height: int
+) -> OutputSchema:
+    pixel_objects = objects_with_pixel_boxes(output.objects, width, height)
+    pixel_steps = [step.model_copy(deep=True) for step in output.steps]
+    return OutputSchema(goal=output.goal, objects=pixel_objects, steps=pixel_steps)
+
+
 def crop_and_save_objects(
     image: Image.Image, objects: List[ObjectItem], dest_dir: Path
 ) -> List[Tuple[ObjectItem, Image.Image, Path]]:
