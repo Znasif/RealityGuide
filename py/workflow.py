@@ -63,6 +63,7 @@ def refresh_plan_from_image(
     resized_image = resize_image(current_image)
 
     completion_prompt = _build_completion_prompt(existing)
+    print(completion_prompt)
 
     completion_text = client.models.generate_content(
         model="gemini-robotics-er-1.5-preview",
@@ -166,7 +167,7 @@ Objects instructions:
 Steps instructions:
 - Produce an ordered list of clear, imperative manipulation steps that move objects into proximity with the similar items they belong with.
 - Reference objects directly in each step and set object_label to one of the previously listed labels verbatim.
-- For every step, include "trajectory": [{"point": [y, x]}, ...] describing up to 10 normalized waypoint pairs (0–1000 integers) charting the motion path toward the destination cluster. Use an empty array when no motion is required.
+- For only the first step in the ordered list, include "trajectory": [{"point": [y, x]}, ...] describing up to 10 normalized waypoint pairs (0–1000 integers) charting how to move that object toward its destination cluster. For all later steps, set "trajectory": [] so the structure stays consistent.
 
 Return JSON structured exactly as {"goal": <goal>, "objects": [{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax]}, ...], "steps": [{"text": <instruction>, "object_label": <object_label>, "trajectory": [{"point": [y, x]}, ...]}, ...]}.
 """
@@ -195,7 +196,7 @@ Steps instructions:
 - For steps that still require work, rewrite the text so it reflects what remains.
 - Maintain the execution order from top to bottom so the robot knows what to do next.
 - Add new steps at the end only if more actions are required to finish the unchanged goal. Use an object_label from the reference list; never invent new labels.
-- Provide "trajectory": [{{"point": [y, x]}}, ...] for every step, using up to 10 normalized waypoint pairs (0–1000 integers) that describe how to move the object toward its intended group. Use an empty array when a step is already satisfied or requires no additional motion.
+- Provide "trajectory": [{{"point": [y, x]}}, ...] only for the first step that is not already prefixed with "[DONE]". Use up to 10 normalized waypoint pairs (0–1000 integers) that describe how to move that object toward its intended group. For all other steps—whether completed or pending—set "trajectory": [] so the schema stays uniform.
 
 Return JSON structured exactly as {{"goal": <goal>, "objects": [{{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax] or null}}, ...], "steps": [{{"text": <step>, "object_label": <label>, "trajectory": [{{"point": [y, x]}}, ...]}}, ...]}} with the goal field appearing before objects.
 The "goal" field MUST be exactly: {existing.goal}
