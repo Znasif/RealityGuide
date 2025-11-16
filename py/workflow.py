@@ -70,7 +70,7 @@ def refresh_plan_from_image(
         contents=[resized_image, completion_prompt],
         config=types.GenerateContentConfig(
             temperature=0.5,
-            thinking_config=types.ThinkingConfig(thinking_budget=512),
+            thinking_config=types.ThinkingConfig(thinking_budget=1024),
             response_mime_type="application/json",
             response_json_schema=OutputSchema.model_json_schema(),
         ),
