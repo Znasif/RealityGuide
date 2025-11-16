@@ -19,8 +19,8 @@ CONTINUATION_BANANA_PATH = Path("data/continuation_first_step_banana.png")
 
 class ObjectItem(BaseModel):
     label: str = Field(description="A unique identifying label.")
-    box_2d: Tuple[int, int, int, int] = Field(
-        description="Normalized [ymin, xmin, ymax, xmax] bounding box coordinates in the 0–1000 range."
+    box_2d: Optional[Tuple[int, int, int, int]] = Field(
+        description="Normalized [ymin, xmin, ymax, xmax] bounding box coordinates in the 0–1000 range, or null when the object is not visible."
     )
 
 
@@ -120,7 +120,11 @@ def objects_with_pixel_boxes(
     return [
         ObjectItem(
             label=obj.label,
-            box_2d=normalized_box_to_pixel_box(obj.box_2d, width, height),
+            box_2d=(
+                normalized_box_to_pixel_box(obj.box_2d, width, height)
+                if obj.box_2d is not None
+                else None
+            ),
         )
         for obj in objects
     ]
@@ -141,13 +145,17 @@ def crop_and_save_objects(
     width, height = image.size
     assets: List[Tuple[ObjectItem, Image.Image, Path]] = []
 
-    for idx, obj in enumerate(objects, start=1):
+    crop_index = 0
+    for obj in objects:
+        if obj.box_2d is None:
+            continue
+        crop_index += 1
         x_min_px, y_min_px, x_max_px, y_max_px = normalized_box_to_pixels(
             obj.box_2d, width, height
         )
 
         crop = image.crop((x_min_px, y_min_px, x_max_px, y_max_px))
-        crop_path = dest_dir / f"object_{idx}_{slugify_label(obj.label)}.png"
+        crop_path = dest_dir / f"object_{crop_index}_{slugify_label(obj.label)}.png"
         crop.save(crop_path)
         assets.append((obj, crop, crop_path))
 
@@ -177,7 +185,7 @@ def highlight_first_step(
 
     first_step = steps[0]
     target_object = find_object_by_label(first_step.object_label, objects)
-    if target_object is None:
+    if target_object is None or target_object.box_2d is None:
         return None
 
     annotated = image.copy()

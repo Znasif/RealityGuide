@@ -50,6 +50,7 @@ def tmp(payload: GoalImageRequest) -> GoalResponse:
     _save_latest_image(image, LATEST_TMP_IMAGE_PATH)
     artifacts = generate_plan_from_image(image)
     goal_id = uuid4().hex
+    print(goal_id)
     _persist_goal(goal_id, artifacts.output)
     return _build_response(goal_id, artifacts, image.size)
 
@@ -60,6 +61,7 @@ def create_goal(payload: GoalImageRequest) -> GoalResponse:
     _save_latest_image(image, LATEST_GOALS_IMAGE_PATH)
     artifacts = generate_plan_from_image(image)
     goal_id = uuid4().hex
+    print(goal_id)
     _persist_goal(goal_id, artifacts.output)
     return _build_response(goal_id, artifacts, image.size)
 

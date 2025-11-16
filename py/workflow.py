@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from google.genai import types
 from PIL import Image
@@ -111,18 +111,20 @@ def refresh_plan_from_image(
             temperature=0.3,
             thinking_config=types.ThinkingConfig(thinking_budget=-1),
             response_mime_type="application/json",
-            response_json_schema=StepsSchema.model_json_schema(),
+            response_json_schema=OutputSchema.model_json_schema(),
         ),
     ).text
 
     if completion_text is None:
         raise RuntimeError("Completion model did not return any content.")
 
-    completion = StepsSchema.model_validate_json(completion_text)
+    completion = OutputSchema.model_validate_json(completion_text)
+
+    merged_objects = merge_objects_by_label(existing.objects, completion.objects)
 
     updated_output = OutputSchema(
         goal=existing.goal,
-        objects=existing.objects,
+        objects=merged_objects,
         steps=completion.steps,
     )
 
@@ -156,10 +158,7 @@ def summarize_objects(objects: Sequence[ObjectItem]) -> str:
     if not objects:
         return "No objects were provided."
 
-    return "\n".join(
-        f"{idx}. {obj.label} — box_2d {list(obj.box_2d)}"
-        for idx, obj in enumerate(objects, start=1)
-    )
+    return "\n".join(f"{idx}. {obj.label}" for idx, obj in enumerate(objects, start=1))
 
 
 def summarize_steps(steps: Sequence[StepItem]) -> str:
@@ -170,6 +169,31 @@ def summarize_steps(steps: Sequence[StepItem]) -> str:
         f"{idx}. {step.text} (object_label: {step.object_label})"
         for idx, step in enumerate(steps, start=1)
     )
+
+
+def merge_objects_by_label(
+    reference_objects: Sequence[ObjectItem],
+    updated_objects: Sequence[ObjectItem],
+) -> List[ObjectItem]:
+    lookup: Dict[str, ObjectItem] = {}
+    for obj in updated_objects:
+        key = obj.label.strip().lower()
+        if not key:
+            continue
+        lookup.setdefault(key, obj)
+
+    merged: List[ObjectItem] = []
+    for obj in reference_objects:
+        key = obj.label.strip().lower()
+        match = lookup.get(key)
+        merged.append(
+            ObjectItem(
+                label=obj.label,
+                box_2d=match.box_2d if match else None,
+            )
+        )
+
+    return merged
 
 
 ANALYSIS_PROMPT = """\
@@ -193,6 +217,8 @@ def _build_steps_prompt(
     objects_summary = (
         "\n".join(
             f"{idx}. {obj.label} — box_2d {list(obj.box_2d)}"
+            if obj.box_2d is not None
+            else f"{idx}. {obj.label} — box_2d null"
             for idx, obj in enumerate(objects, start=1)
         )
         if objects
@@ -232,16 +258,21 @@ Prior ordered steps:
 {summarize_steps(existing.steps)}
 
 Look at the updated scene image (attachment) and determine which steps have been completed.
-Instructions:
+Objects instructions:
+- For each label above (and in the same order), inspect the latest image and provide its bounding box as normalized integers in [ymin, xmin, ymax, xmax] format spanning 0–1000.
+- Do not introduce new labels or reorder them. When an object is not visible, set its box_2d to null.
+
+Steps instructions:
 - For each existing step, keep its object_label identical.
 - When a step is fully satisfied, prefix its text with "[DONE] " but keep the rest of the wording.
 - For steps that still require work, rewrite the text so it reflects what remains.
 - Maintain the execution order from top to bottom so the robot knows what to do next.
 - Add new steps at the end only if more actions are required to finish the unchanged goal. Use an object_label from the reference list; never invent new labels.
-- Always output JSON matching {{"goal": <goal>, "steps": [{{"text": <step>, "object_label": <label>}}, ...]}}.
-- The "goal" field MUST be exactly: {existing.goal}
 
-If no steps were provided, create a fresh ordered list that the robot can follow from the current state to finish the goal.
+Return JSON structured exactly as {{"goal": <goal>, "objects": [{{"label": <label>, "box_2d": [ymin, xmin, ymax, xmax] or null}}, ...], "steps": [{{"text": <step>, "object_label": <label>}}, ...]}} with the goal field appearing before objects.
+The "goal" field MUST be exactly: {existing.goal}
+
+If no steps were provided previously, create a fresh ordered list that the robot can follow from the current state to finish the goal.
 """
 
 
