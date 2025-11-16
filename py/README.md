@@ -15,6 +15,31 @@ GEMINI_API_KEY='FIXME'
 
 Learn more about the project: [AGENTS.md](AGENTS.md)
 
+## HTTP API
+
+RealityGuide can also run as a FastAPI service that mirrors the CLI behavior.
+
+1. Ensure `.env` contains `GEMINI_API_KEY`, then start the server:
+   ```
+   uv run --env-file .env fastapi dev server.py
+   ```
+2. Send requests by POSTing base64-encoded images to the API. The helper script wraps this for you:
+   ```
+   uv run python api_client.py sample/1.jpg
+   ```
+   Re-run the script with `--goal-id <returned_id>` to call the continuation flow (HTTP `PUT`).
+
+### Endpoints
+
+- `POST /goals`
+  - Body: `{ "image_base64": "..." }`
+  - Action: runs the initial planning workflow, stores the resulting JSON in `goals/{id}.json`, and returns `{ id, plan, highlight_image_base64, banana_image_base64 }`.
+- `PUT /goals/{id}`
+  - Body: `{ "image_base64": "..." }`
+  - Action: loads the saved plan for `id`, evaluates progress against the new photo, updates the stored JSON, and returns the same response structure.
+
+`highlight_image_base64` and `banana_image_base64` may be `null` when no artifact was produced. All image payloads may optionally use the `data:image/...;base64,` prefix.
+
 ## Example result
 
 **Command**:

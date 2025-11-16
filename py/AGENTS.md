@@ -3,12 +3,14 @@ RealityGuide turns scene images into step-by-step manipulation guides for real-w
 
 `check_completion.py` revisits the same workspace after actions have been taken. Given a fresh photo plus the previous plan, it marks finished steps, rewrites whatever still needs doing, and, if necessary, appends new actions to finish the original goal. It mirrors the initial run by calling attention to the next object to manipulate and refreshing the Gemini-generated visualization.
 
-All of this is underpinned by `shared.py`, which defines the schemas for goals, objects, and steps while handling the common chores of resizing images, cropping object callouts, locating the right bounding box for a step, and dispatching the Gemini image generations.
+All of this is underpinned by `shared.py`, which defines the schemas for goals, objects, and steps while handling the common chores of resizing images, cropping object callouts, locating the right bounding box for a step, and dispatching the Gemini image generations. The reusable workflows live in `workflow.py`, and `server.py` exposes those flows over FastAPI so clients can hit `POST /goals` to create a plan or `PUT /goals/{id}` to refresh progress using base64-encoded images persisted under `/goals`.
 
 ## Commands
 - `uv run --env-file .env main.py` — run the program
 - `uv run ruff check --fix && uv run ruff format` — lint and format
 - `uv run basedpyright` — run type checks
 - `uv run python -c "print('hello')"` — run a Python
+- `uv run --env-file .env fastapi dev server.py` — start the HTTP API
+- `uv run api_client.py sample/1.jpg [--goal-id <existing_id>]` — exercise the API via the helper client
 
 Run type checks, lint, and format after making any Python file changes.
