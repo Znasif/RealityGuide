@@ -11,4 +11,4 @@ All of this is underpinned by `shared.py`, which defines the schemas for goals, 
 - `uv run basedpyright` — run type checks
 - `uv run python -c "print('hello')"` — run a Python
 
-Run type checks, lint, and format after making any changes.
+Run type checks, lint, and format after making any Python file changes.
