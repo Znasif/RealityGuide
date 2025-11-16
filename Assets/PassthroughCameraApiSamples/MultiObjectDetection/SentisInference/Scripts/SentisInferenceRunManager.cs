@@ -80,7 +80,7 @@ namespace PassthroughCameraSamples.MultiObjectDetection
                 Texture targetTexture = cameraAccess.GetTexture();
                 m_uiInference.SetDetectionCapture(targetTexture);
                 // Convert the texture to a Tensor and schedule the inference
-                var textureTransform = new TextureTransform().SetDimensions(targetTexture.width, targetTexture.height, 3);
+                var textureTransform = new TextureTransform();
                 m_input = new Tensor<float>(new TensorShape(1, 3, m_inputSize.x, m_inputSize.y));
                 TextureConverter.ToTensor(targetTexture, m_input, textureTransform);
                 m_schedule = m_engine.ScheduleIterable(m_input);
@@ -105,7 +105,7 @@ namespace PassthroughCameraSamples.MultiObjectDetection
             m_engine = new Worker(model, m_backend);
             //Run a inference with a empty image to load the model in the memory and not pause the main thread.
             Texture m_loadingTexture = new Texture2D(m_inputSize.x, m_inputSize.y, TextureFormat.RGBA32, false);
-            var textureTransform = new TextureTransform().SetDimensions(m_loadingTexture.width, m_loadingTexture.height, 3);
+            var textureTransform = new TextureTransform();
             m_input = new Tensor<float>(new TensorShape(1, 3, m_inputSize.x, m_inputSize.y));
             TextureConverter.ToTensor(m_loadingTexture, m_input, textureTransform);
             m_engine.Schedule(m_input);
