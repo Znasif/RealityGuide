@@ -96,10 +96,12 @@ If no steps were provided, create a fresh ordered list that the robot can follow
         steps=completion.steps,
     )
 
+    remaining_steps = actionable_steps(updated_output.steps)
+
     highlight_path = highlight_first_step(
         current_image,
         updated_output.objects,
-        updated_output.steps,
+        remaining_steps,
         CONTINUATION_HIGHLIGHT_PATH,
     )
     if highlight_path:
@@ -112,7 +114,7 @@ If no steps were provided, create a fresh ordered list that the robot can follow
         )
 
     banana_path: Optional[Path] = None
-    first_step = updated_output.steps[0] if updated_output.steps else None
+    first_step = remaining_steps[0] if remaining_steps else None
     if highlight_path and first_step:
         banana_path = banana(
             step_text=first_step.text,
@@ -155,6 +157,16 @@ def summarize_steps(steps: List[StepItem]) -> str:
         f"{idx}. {step.text} (object_label: {step.object_label})"
         for idx, step in enumerate(steps, start=1)
     )
+
+
+def actionable_steps(steps: List[StepItem]) -> List[StepItem]:
+    result: List[StepItem] = []
+    for step in steps:
+        text = step.text.lstrip()
+        if text.upper().startswith("[DONE]"):
+            continue
+        result.append(step)
+    return result
 
 
 if __name__ == "__main__":
