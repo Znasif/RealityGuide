@@ -84,8 +84,25 @@ namespace PassthroughCameraSamples.ZeroShot
 
             if (OVRInput.GetDown(OVRInput.Button.Two))
             {
-                m_isDebugOn = !m_isDebugOn;
-                Debug.Log($"PCA: SpatialSnapshotManager: DEBUG mode is {(m_isDebugOn ? "ON" : "OFF")}");
+                //m_isDebugOn = !m_isDebugOn;
+                //Debug.Log($"PCA: SpatialSnapshotManager: DEBUG mode is {(m_isDebugOn ? "ON" : "OFF")}");
+                //UpdateRaysRendering();
+                m_snapshotTaken = !m_snapshotTaken;
+                if (m_snapshotTaken)
+                {
+                    // Asking the canvas to make a snapshot before stopping the camera access
+                    m_cameraCanvas.GoalSnapshot();
+                    m_snapshotHeadPose = m_centerEyeAnchor.transform.ToOVRPose();
+                    UpdateMarkerPoses();
+                    TranslateMarkersForDebug();
+                    m_cameraAccess.enabled = false;
+                }
+                else
+                {
+                    m_cameraAccess.enabled = true;
+                    m_cameraCanvas.ResumeStreamingFromCamera();
+                }
+
                 UpdateRaysRendering();
             }
 
