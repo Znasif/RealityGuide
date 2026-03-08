@@ -1,5 +1,13 @@
 {
   "dependencies": {
+    "com.frl.aepsych": {
+      "version": "file:com.frl.aepsych",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "1.1.2"
+      }
+    },
     "com.meta.xr.mrutilitykit": {
       "version": "81.0.0",
       "depth": 0,

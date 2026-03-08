@@ -1,0 +1,25 @@
+{
+  "name": "com.frl.aepsych",
+  "displayName": "AEPsych Package",
+  "version": "2.0.0",
+  "unity": "2020.3",
+  "description": "This package includes the Ax-compatible AEPsych Unity client and example experiments. This client makes use of Ax features not available in older versions of AEPsych, but not all legacy AEPsych features work yet. This version of the package will be made the default in the future. Compatible with AEPsych server version 0.4.0 and above. Check aepsych.org for usage and server installation instructions",
+  "author": {
+    "name": "Stryker Buffington",
+    "email": "sbuffington@fb.com",
+    "url": "https://www.internalfb.com/intern/profile/sbuffington/"
+  },
+  "keywords": [
+    "AEPsych",
+    "Package"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "1.1.2"
+  },
+  "samples": [
+    {
+      "displayName": "AEPsych Client",
+      "path": ".Samples/Client"
+    }
+  ]
+}

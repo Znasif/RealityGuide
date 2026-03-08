@@ -85,7 +85,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 0
+  m_PresetInfoIsWorld: 1
 --- !u!114 &5764044298315428743
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -118,6 +118,10 @@ MonoBehaviour:
   m_cameraAccess: {fileID: 0}
   m_debugText: {fileID: 0}
   m_image: {fileID: 0}
+  m_url: https://78cac2b11d0b.ngrok-free.app/
+  loadingIcon: {fileID: 0}
+  ttsSpeaker: {fileID: 0}
+  dictationText: 
 --- !u!1 &8200289314803071706
 GameObject:
   m_ObjectHideFlags: 0

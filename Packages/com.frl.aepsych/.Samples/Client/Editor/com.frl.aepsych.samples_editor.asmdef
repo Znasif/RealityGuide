@@ -1,0 +1,21 @@
+{
+    "name": "com.frl.aepsych.samples_editor",
+    "rootNamespace": "",
+    "references": [
+        "Unity.TextMeshPro",
+        "com.frl.aepsych.Runtime",
+        "com.frl.aepsych.editor",
+        "com.frl.aepsych.samples"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

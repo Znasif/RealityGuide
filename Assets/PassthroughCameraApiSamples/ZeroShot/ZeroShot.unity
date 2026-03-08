@@ -14644,6 +14644,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6001449851554480344, guid: 09bb5565c76501c4389238427673adb6, type: 3}
+      propertyPath: m_url
+      value: https://78cac2b11d0b.ngrok-free.app/
+      objectReference: {fileID: 0}
+    - target: {fileID: 6001449851554480344, guid: 09bb5565c76501c4389238427673adb6, type: 3}
       propertyPath: m_image
       value: 
       objectReference: {fileID: 3827143533751235035}

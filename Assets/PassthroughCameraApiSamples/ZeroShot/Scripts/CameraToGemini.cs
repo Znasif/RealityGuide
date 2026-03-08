@@ -21,7 +21,7 @@ namespace PassthroughCameraSamples.ZeroShot
         [SerializeField] private PassthroughCameraAccess m_cameraAccess;
         [SerializeField] private Text m_debugText;
         [SerializeField] private RawImage m_image;
-        [SerializeField] private string m_url = "https://flexible-loudly-polliwog.ngrok-free.app/";
+        [SerializeField] private string m_url = "https://78cac2b11d0b.ngrok-free.app/";
         [SerializeField] private GameObject loadingIcon;
         private Texture2D m_cameraSnapshot;
         private GeminiRoboticsPlanResponse planResponse;
@@ -30,7 +30,6 @@ namespace PassthroughCameraSamples.ZeroShot
         public string dictationText = "";
 
         // Make this an async void method to allow awaiting the network request
-        // In your CameraCanvas class (assuming it's a MonoBehaviour)
         public void MakeCameraSnapshot()
         {
             if (!m_cameraAccess.IsPlaying)
@@ -87,7 +86,7 @@ namespace PassthroughCameraSamples.ZeroShot
 
         private IEnumerator SendGoalAndUpdateTextureCoroutine(Texture2D snapshot)
         {
-            Debug.Log($"Starting network request Gemini for id: {currentGoalId}");
+            Debug.Log($"Starting network request Gemini for id: {currentGoalId} at {m_url}");
             // You could show a loading spinner UI here
 
             // Call the async method, which returns a Task immediately
