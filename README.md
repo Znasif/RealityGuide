@@ -2,7 +2,9 @@
 
 RealityGuide is a visual coach for real-world tasks. Snap a photo through a Quest 3 and it shows what action to take next, illustrating it with easy-to-follow visuals instead of text.
 
-TODO: Add an image or video here
+https://github.com/user-attachments/assets/4856be5c-e162-4f25-9dbb-9d5d4d7514c5
+
+Learn more about the project: [Devpost](https://devpost.com/software/realityguide)
 
 ## Why RealityGuide
 - **Visual-first assistance:** Overlays show the very next move, so anyone can follow along without reading lengthy manuals.
